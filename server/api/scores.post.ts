@@ -8,6 +8,7 @@ import { randomUUID } from "crypto";
 
 const createScoreBodySchema = z.object({
   score: z.number(),
+  total: z.number(),
   resourceId: z.number(),
 });
 
@@ -16,15 +17,18 @@ export default defineEventHandler(async (event) => {
   const body = await readBody(event);
   const { jwtSecret } = useRuntimeConfig();
   let inputScore: number;
+  let totalScore: number;
   // ✅ Validate body
   try {
     const parsed = await createScoreBodySchema.parseAsync(body);
     inputScore = parsed.score;
+    totalScore = parsed.total;
     logger.info({
       requestId,
-      msg: "Score API called",
+      msg: "Score API called Test",
       score: inputScore,
       resourceId: parsed.resourceId,
+      totalScore:totalScore
     });
   } catch {
     logger.warn({
@@ -126,7 +130,7 @@ export default defineEventHandler(async (event) => {
   const payload = {
     userId: String(sub),
     scoreGiven: inputScore, // send directly (0–100)
-    scoreMaximum: 100,
+    scoreMaximum: totalScore,
     activityProgress: "Completed",
     gradingProgress: "FullyGraded",
     timestamp: new Date().toISOString(),

@@ -12,20 +12,22 @@ export default defineEventHandler(async (event) => {
       msg: "Webhook received",
       body,
     });
-    const { exam_id, percentage, additional_info } = body;
-    if (!additional_info?.attemptId) {
+    const { exam_id, candidateScore, additional_info,client_id } = body;
+    const [getscore, totalStr] = candidateScore.split("/");
+    if (!client_id) {
       logger.warn({
         requestId,
-        msg: "Missing attemptId",
+        msg: "Missing client_id",
         body,
       });
       throw createError({
         statusCode: 400,
-        statusMessage: "attemptId missing",
+        statusMessage: "client_id missing",
       });
     }
-    const attemptId = additional_info.attemptId;
-    const score = Number(percentage || 0);
+    const attemptId = client_id;
+    const score = Number(getscore || 0);
+    const total = Number(totalStr || 0);
     await connectDB();
     // ✅ Find mapping
     const launch = await Launch.findOne({ attemptId } as any);
@@ -64,6 +66,7 @@ export default defineEventHandler(async (event) => {
       requestId,
       msg: "LTI token generated",
       userId: launch.userId,
+      ltitoken:ltiToken
     });
     logger.info({
       requestId,
@@ -78,19 +81,19 @@ export default defineEventHandler(async (event) => {
       },
       body: {
         score,
+        total,
         resourceId: launch.examId,
       },
     });
     logger.info({
       requestId,
       msg: "✅ Score updated in Moodle",
-      attemptId,
+      client_id,
     });
     return {
       success: true,
       message: "Score updated",
     };
-
   } catch (err: any) {
     logger.error({
       requestId,
