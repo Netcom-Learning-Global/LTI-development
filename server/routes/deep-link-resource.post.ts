@@ -1,0 +1,163 @@
+import { ZodError, z } from "zod";
+import { connectDB } from "../utils/db";
+import Platform from "../models/Platform";
+import { jwtVerify } from "../utils/auth";
+import jwt from "jsonwebtoken";
+import { ToolLtiTokenPayload } from "../types/toolLtiToken";
+import useIDTokenStorage, {
+  getIDTokenStorageKey,
+} from "../storage/idToken";
+
+const deepLinkResourceBodySchema = z.object({
+  resourceId: z.number(),
+  title: z.string().optional(),
+});
+
+export default defineEventHandler(async (event) => {
+  const body = await readBody(event);
+  const { jwtSecret } = useRuntimeConfig();
+
+  let resourceId, title;
+
+  // ✅ Validate body
+  try {
+    ({ resourceId, title } =
+      await deepLinkResourceBodySchema.parseAsync(body));
+  } catch (error: any) {
+    if (error instanceof ZodError) {
+      throw createError({
+        statusCode: 400,
+        statusMessage: error.message,
+      });
+    }
+    throw createError({
+      statusCode: 500,
+      statusMessage: "Something went wrong",
+    });
+  }
+
+  // ✅ AUTH HEADER
+  const Authorization = getHeader(event, "Authorization");
+  const schema = Authorization?.split(" ")[0];
+  const token = Authorization?.split(" ")[1];
+
+  if (schema !== "Bearer" || !token) {
+    throw createError({
+      statusCode: 401,
+      statusMessage: "Invalid token",
+    });
+  }
+
+  // ✅ VERIFY TOOL TOKEN
+  let toolToken;
+  try {
+    toolToken = await jwtVerify(token, jwtSecret);
+  } catch {
+    throw createError({
+      statusCode: 401,
+      statusMessage: "Invalid token",
+    });
+  }
+
+  const { clientId, platformUrl, deploymentId, userId } =
+    toolToken as ToolLtiTokenPayload;
+
+  // ✅ CONNECT DB
+  await connectDB();
+
+  // ✅ FETCH PLATFORM
+  const record = await Platform.findOne({
+    iss: platformUrl,
+    clientId,
+  });
+
+  const platform = record?.data;
+
+  console.log("PLATFORM FROM DB:", platform);
+
+  if (!platform) {
+    throw createError({
+      statusCode: 404,
+      statusMessage: "Platform not found",
+    });
+  }
+
+  // 🔥 FIX: USE DB PRIVATE KEY (NOT MEMORY)
+  const platformPrivateKey = platform.privateKey;
+
+  if (!platformPrivateKey) {
+    throw createError({
+      statusCode: 500,
+      statusMessage: "Platform private key not found",
+    });
+  }
+
+  // ✅ PREPARE ITEM
+  const item = {
+    type: "ltiResourceLink",
+    title: title || `Resource ${resourceId}`,
+    custom: {
+      resource_id: resourceId,
+    },
+    lineItem: {
+      scoreMaximum: 100,
+      resourceId,
+    },
+  };
+
+  // ✅ JWT BODY
+  const jwtBody = {
+    iss: clientId,
+    aud: platformUrl,
+    nonce: encodeURIComponent(
+      [...Array(25)]
+        .map(() => ((Math.random() * 36) | 0).toString(36))
+        .join("")
+    ),
+    "https://purl.imsglobal.org/spec/lti/claim/deployment_id":
+      deploymentId,
+    "https://purl.imsglobal.org/spec/lti/claim/message_type":
+      "LtiDeepLinkingResponse",
+    "https://purl.imsglobal.org/spec/lti/claim/version": "1.3.0",
+    "https://purl.imsglobal.org/spec/lti-dl/claim/content_items": [item],
+  };
+
+  // ✅ SIGN JWT
+  const message = jwt.sign(jwtBody, platformPrivateKey, {
+    algorithm: "RS256",
+    expiresIn: 60,
+    keyid: platform.kid,
+  });
+
+  // ✅ FETCH ID TOKEN
+  const idTokenStorage = useIDTokenStorage();
+  const idToken = await idTokenStorage.getItem(
+    getIDTokenStorageKey({
+      issuer: platformUrl,
+      clientId,
+      deploymentId,
+      userId,
+    })
+  );
+
+  if (!idToken) {
+    throw createError({
+      statusCode: 404,
+      statusMessage: "ID token not found",
+    });
+  }
+
+  const returnUrl =
+    idToken[
+      "https://purl.imsglobal.org/spec/lti-dl/claim/deep_linking_settings"
+    ]?.deep_link_return_url;
+
+  appendResponseHeaders(event, {
+    "content-type": "text/html",
+  });
+
+  return `<form id="ltijs_submit" style="display:none;" action="${returnUrl}" method="POST">
+      <input type="hidden" name="JWT" value="${message}" />
+    </form>
+    <script>document.getElementById("ltijs_submit").submit()</script>`;
+});

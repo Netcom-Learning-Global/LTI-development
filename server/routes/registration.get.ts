@@ -1,0 +1,191 @@
+import { ZodError, z } from "zod";
+import { generatePlatformKeyPair } from "../utils/auth";
+import { connectDB } from "../utils/db";
+import Platform from "../models/Platform";
+
+type Configuration = {
+  issuer: string;
+  token_endpoint: string;
+  jwks_uri: string;
+  authorization_endpoint: string;
+  registration_endpoint: string;
+  claims_supported: string[];
+  "https://purl.imsglobal.org/spec/lti-platform-configuration": {
+    product_family_code: string;
+  };
+};
+
+const registrationQuerySchema = z.object({
+  openid_configuration: z.string(),
+  registration_token: z.string().optional(),
+});
+
+export default defineEventHandler(async (event) => {
+  const query = getQuery(event);
+  const { serverUrl } = useRuntimeConfig();
+
+  let configurationEndpoint, registrationToken;
+
+  try {
+    ({
+      openid_configuration: configurationEndpoint,
+      registration_token: registrationToken,
+    } = await registrationQuerySchema.parseAsync(query));
+  } catch (error: any) {
+    console.error(" Error parsing query", error);
+
+    if (error instanceof ZodError) {
+      throw createError({
+        statusCode: 400,
+        statusMessage: error.message,
+      });
+    }
+
+    throw createError({
+      statusCode: 500,
+      statusMessage: "Something went wrong",
+    });
+  }
+
+const configRes = await fetch(configurationEndpoint);
+//console.log("👉 CONFIG STATUS:", configRes.status);
+
+const configuration: Configuration = await configRes.json();
+//console.log("👉 CONFIG DATA:", configuration);
+ // const configuration: Configuration = await fetch(configurationEndpoint).then(res => res.json());
+
+  const scope = [
+    "https://purl.imsglobal.org/spec/lti-ags/scope/lineitem.readonly",
+    "https://purl.imsglobal.org/spec/lti-ags/scope/lineitem",
+    "https://purl.imsglobal.org/spec/lti-ags/scope/score",
+    "https://purl.imsglobal.org/spec/lti-ags/scope/result.readonly",
+    "https://purl.imsglobal.org/spec/lti-nrps/scope/contextmembership.readonly",
+  ];
+
+  const launchUrl = new URL("launch", serverUrl);
+  const deepLinkUrl = new URL("deep-link-launch", serverUrl);
+  const loginUrl = new URL("login", serverUrl);
+  const keysUrl = new URL("keys", serverUrl);
+
+  const registrationRequest = {
+    application_type: "web",
+    grant_types: ["implicit", "client_credentials"],
+    response_types: ["id_token"],
+    redirect_uris: [launchUrl.href, deepLinkUrl.href],
+    initiate_login_uri: loginUrl.href,
+    client_name: "Proctor LTI Tool",
+    jwks_uri: keysUrl.href,
+    logo_uri: "https://moodle.org/theme/image.php/boost/lti/1776507478/monologo",
+    token_endpoint_auth_method: "private_key_jwt",
+    scope: scope.join(" "),
+    "https://purl.imsglobal.org/spec/lti-tool-configuration": {
+      domain: serverUrl,
+      description: "Connect your LMS for testing purposes",
+      target_link_uri: launchUrl.href,
+      custom_parameters: {},
+      claims: configuration.claims_supported,
+      messages: [
+        {
+          type: "LtiResourceLinkRequest",
+          target_link_uri: launchUrl.href,
+          launch_presentation: {
+            document_target: "window"
+          }
+        },
+        {
+          type: "LtiDeepLinkingRequest",
+          target_link_uri: deepLinkUrl.href,
+          launch_presentation: {
+            document_target: "window"
+          }
+        },
+      ],
+    },
+  };
+
+  // ✅ Register tool with LMS
+  //console.log("👉 REG ENDPOINT:", configuration.registration_endpoint);
+
+const regRes = await fetch(configuration.registration_endpoint, {
+  method: "POST",
+  body: JSON.stringify(registrationRequest),
+  headers: {
+    Authorization: `Bearer ${registrationToken}`,
+    "Content-Type": "application/json",
+  },
+});
+
+console.log("👉 REG STATUS:", regRes.status);
+
+const regData = await regRes.json();
+console.log("👉 REG RESPONSE:", regData);
+
+const clientId = regData.client_id;
+  /*
+  const { client_id: clientId }: { client_id: string } = await fetch(
+    configuration.registration_endpoint,
+    {
+      method: "POST",
+      body: JSON.stringify(registrationRequest),
+      headers: {
+        Authorization: `Bearer ${registrationToken}`,
+        "Content-Type": "application/json",
+      },
+    }
+  ).then(res => res.json());
+*/
+  const platformName =
+    configuration["https://purl.imsglobal.org/spec/lti-platform-configuration"]
+      .product_family_code;
+
+  const { kid, privateKey, publicKey } = await generatePlatformKeyPair();
+
+  // ✅ FINAL PLATFORM OBJECT
+  const platform = {
+    url: configuration.issuer,
+    name: platformName,
+    clientId,
+    authenticationEndpoint: configuration.authorization_endpoint,
+    accessTokenEndpoint: configuration.token_endpoint, // ✅ FIXED
+    authConfig: {
+      method: "JWK_SET",
+      key: configuration.jwks_uri,
+    },
+    kid,
+    privateKey, 
+    publicKey,
+  };
+
+  console.log("📦 REGISTERING PLATFORM:", platform);
+
+  // ✅ CONNECT DB
+  await connectDB();
+
+  // ✅ SAVE TO MONGODB (NO DUPLICATE ISSUE)
+  console.log("👉 SAVING PLATFORM:", platform);
+  await Platform.findOneAndUpdate(
+    {
+      iss: platform.url,
+      clientId: platform.clientId,
+    },
+    {
+      iss: platform.url,
+      clientId: platform.clientId,
+      data: platform,
+    },
+    { upsert: true, new: true }
+  );
+  console.log("✅ Platform stored in MongoDB");
+
+  appendResponseHeaders(event, {
+    "content-type": "text/html",
+  });
+
+  return `<script>
+    console.log("Registration success");
+    (window.opener || window.parent).postMessage(
+      {subject:"org.imsglobal.lti.close"},
+      "*"
+    );
+  </script>`;
+});
