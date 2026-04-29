@@ -130,14 +130,14 @@ if (!lineitem) {
         examId
       },
       {
-        attemptId,
+        attemptId:token,
         email
       }
     );
     logger.info({
       requestId,
       msg: "Launch mapping saved",
-      attemptId,
+      attemptId:token,
     });
     const redirectUrl = `${process.env.STUDENT_URL}?examId=${examId}&userId=${token}&attemptId=${attemptId}`;
     return { redirectUrl };
