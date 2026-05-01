@@ -5,9 +5,11 @@ import {
   createToolLtiToken,
   validatePlatformToken,
 } from "../utils/auth";
-import { getStateCookieName } from "../utils/cookie";
 import jwt from "jsonwebtoken";
 import useIDTokenStorage, { getIDTokenStorageKey } from "../storage/idToken";
+
+// 🔥 NEW: simple state store (replace with DB/Redis in prod)
+import { getState } from "../storage/state"; // you will create this
 
 const deepLinkLaunchBodySchema = z.object({
   id_token: z.string(),
@@ -17,13 +19,14 @@ const deepLinkLaunchBodySchema = z.object({
 export default defineEventHandler(async (event) => {
   const { serverUrl } = useRuntimeConfig();
   const body = await readBody(event);
+
   let idToken, state;
+
+  // ✅ Parse body
   try {
-    ({ id_token: idToken, state } = await deepLinkLaunchBodySchema.parseAsync(
-      body
-    ));
+    ({ id_token: idToken, state } =
+      await deepLinkLaunchBodySchema.parseAsync(body));
   } catch (error: any) {
-    console.error("Error parsing launch body", error);
     if (error instanceof ZodError) {
       throw createError({
         statusCode: 400,
@@ -37,10 +40,11 @@ export default defineEventHandler(async (event) => {
   }
 
   let tokenPayload;
+
+  // ✅ Validate LTI token
   try {
     tokenPayload = await validatePlatformToken(idToken);
   } catch (error) {
-    console.error("Error validating platform token", error);
     if (error instanceof PlatformNotFoundError) {
       throw createError({
         statusCode: 404,
@@ -68,17 +72,38 @@ export default defineEventHandler(async (event) => {
     });
   }
 
-  const cookieName = getStateCookieName(state);
-  const issuer = getCookie(event, cookieName);
-  deleteCookie(event, cookieName);
-  if (!issuer || tokenPayload.iss !== issuer) {
+  // 🔥 ===== FIX: SERVER-SIDE STATE VALIDATION =====
+  const stateData = await getState(state);
+
+  if (!stateData) {
     throw createError({
       statusCode: 401,
-      statusMessage: "Invalid state",
+      statusMessage: "State not found",
     });
   }
 
+  if (stateData.issuer !== tokenPayload.iss) {
+    throw createError({
+      statusCode: 401,
+      statusMessage: "Invalid state issuer",
+    });
+  }
+
+  // ⏳ Expiry check (5 minutes)
+  if (Date.now() - stateData.createdAt > 5 * 60 * 1000) {
+    throw createError({
+      statusCode: 401,
+      statusMessage: "State expired",
+    });
+  }
+
+  // 🔐 Prevent replay
+  await stateData.delete();
+  // 🔥 ===== END FIX =====
+
+  // ✅ Store ID Token
   const idTokenStorage = useIDTokenStorage();
+
   const idTokenStorageKey = getIDTokenStorageKey({
     issuer: tokenPayload.iss,
     clientId: tokenPayload.aud,
@@ -86,11 +111,15 @@ export default defineEventHandler(async (event) => {
       tokenPayload["https://purl.imsglobal.org/spec/lti/claim/deployment_id"],
     userId: tokenPayload.sub,
   });
-  //console.info("Storing ID token: ", idTokenStorageKey, tokenPayload);
+
   await idTokenStorage.setItem(idTokenStorageKey, tokenPayload);
 
+  // ✅ Create internal LTI token
   const ltiToken = createToolLtiToken(tokenPayload);
+
+  // ✅ Redirect to your deep link UI
   const url = new URL("deep-link-select", serverUrl);
   url.searchParams.append("lti", ltiToken);
+
   return sendRedirect(event, url.href);
 });

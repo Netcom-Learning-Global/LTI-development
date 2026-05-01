@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import { getStateCookieName } from "../utils/cookie";
 import { connectDB } from "../utils/db";
 import Platform from "../models/Platform";
+import { setState } from "../storage/state";
 
 type LoginParams = {
   iss: string;
@@ -18,7 +19,6 @@ export default defineEventHandler(async (event) => {
     : await readBody(event);
 
   console.log("LOGIN PARAMS:", params);
-  console.log("LOOKUP KEY:", `${params.iss}:${params.client_id}`);
 
   // ✅ CONNECT DB
   await connectDB();
@@ -39,23 +39,27 @@ export default defineEventHandler(async (event) => {
       statusMessage: "Platform not found.",
     });
   }
+  // ✅ STATE (generate)
+  const state = randomBytes(25).toString("hex");
 
-  // ✅ STATE COOKIE
-  const state = encodeURIComponent(randomBytes(25).toString("hex"));
+  // ✅ STORE STATE IN SERVER (CRITICAL FIX)
+  await setState(state, {
+    issuer: params.iss,
+    clientId: params.client_id,
+    createdAt: Date.now(),
+  });
   const cookieName = getStateCookieName(state);
 
   setCookie(event, cookieName, params.iss, {
     httpOnly: true,
     maxAge: 60 * 1000,
-    secure: true,
-    sameSite: "none",
+    secure: false,
+    sameSite: "lax",
     path: "/",
   });
 
   // ✅ NONCE
-  const nonce = encodeURIComponent(
-    [...Array(25)].map(() => ((Math.random() * 36) | 0).toString(36)).join("")
-  );
+  const nonce = randomBytes(25).toString("hex");
 
   const authRequestQuery = {
     response_type: "id_token",
