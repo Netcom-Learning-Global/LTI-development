@@ -65,10 +65,7 @@ export default defineEventHandler(async (event) => {
   }
   const { iss, aud, sub } = toolToken;
 
-  const platformUrl =
-    iss === "http://localhost:9000"
-      ? "http://localhost:8080"
-      : iss;
+  const platformUrl =iss; 
 
   await connectDB();
 

@@ -51,9 +51,7 @@ export default defineEventHandler(async (event) => {
     const { jwtSecret } = useRuntimeConfig();
     const ltiToken = jwt.sign(
       {
-        iss: launch.platformUrl === "http://localhost:9000"
-          ? "http://localhost:8080"   // ✅ fix platform URL
-          : launch.platformUrl,
+        iss: launch.platformUrl,
         aud: launch.clientId,         // ✅ clientId
         sub: launch.userId,           // ✅ userId
         "https://purl.imsglobal.org/spec/lti/claim/deployment_id":
