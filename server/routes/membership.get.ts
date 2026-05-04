@@ -9,8 +9,6 @@ import useIDTokenStorage, {
 
 export default defineEventHandler(async (event) => {
   const { jwtSecret } = useRuntimeConfig();
-
-  // ✅ AUTH HEADER
   const Authorization = getHeader(event, "Authorization");
   const schema = Authorization?.split(" ")[0];
   const token = Authorization?.split(" ")[1];
@@ -28,8 +26,6 @@ export default defineEventHandler(async (event) => {
       statusMessage: "Token not found",
     });
   }
-
-  // ✅ VERIFY TOKEN
   let toolToken;
 
   try {
@@ -67,8 +63,6 @@ export default defineEventHandler(async (event) => {
 
   const platform = record?.data;
 
-  console.log("PLATFORM FROM DB:", platform);
-
   if (!platform) {
     throw createError({
       statusCode: 404,
@@ -93,19 +87,14 @@ export default defineEventHandler(async (event) => {
       statusMessage: "ID token not found",
     });
   }
-
-  // ✅ GET ACCESS TOKEN (LTI AGS / NRPS)
   const { accessToken, tokenType } = await getAccessToken(platform, [
     "https://purl.imsglobal.org/spec/lti-nrps/scope/contextmembership.readonly",
   ]);
 
-  // ✅ MEMBERSHIP URL
   const { context_memberships_url: membershipUrl } =
     idToken[
       "https://purl.imsglobal.org/spec/lti-nrps/claim/namesroleservice"
     ];
-
-  // ✅ FETCH MEMBERS
   return await fetch(membershipUrl, {
     headers: {
       Authorization: `${tokenType} ${accessToken}`,

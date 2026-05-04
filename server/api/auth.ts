@@ -35,7 +35,6 @@ export const getAccessToken = async () => {
       msg: "AUTH API ERROR",
       url,
       status: err.response?.status,
-      response: err.response?.data,
       error: err.message,
     });
 

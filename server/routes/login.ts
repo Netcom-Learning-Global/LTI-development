@@ -3,6 +3,7 @@ import { getStateCookieName } from "../utils/cookie";
 import { connectDB } from "../utils/db";
 import Platform from "../models/Platform";
 import { setState } from "../storage/state";
+import logger from "../utils/logger";
 
 type LoginParams = {
   iss: string;
@@ -17,9 +18,10 @@ export default defineEventHandler(async (event) => {
   const params: LoginParams = isMethod(event, "GET")
     ? (getQuery(event) as any)
     : await readBody(event);
-
-  console.log("LOGIN PARAMS:", params);
-
+  logger.info("LTI login request received", {
+    iss: params.iss,
+    client_id: params.client_id,
+  });
   // ✅ CONNECT DB
   await connectDB();
 
@@ -30,9 +32,6 @@ export default defineEventHandler(async (event) => {
   });
 
   const platform = record?.data;
-
-  console.log("PLATFORM FROM DB:", platform);
-
   if (!platform) {
     throw createError({
       statusCode: 404,
@@ -60,7 +59,6 @@ export default defineEventHandler(async (event) => {
 
   // ✅ NONCE
   const nonce = randomBytes(25).toString("hex");
-
   const authRequestQuery = {
     response_type: "id_token",
     response_mode: "form_post",
@@ -78,6 +76,8 @@ export default defineEventHandler(async (event) => {
 
   const url = new URL(platform.authenticationEndpoint);
   url.search = new URLSearchParams(authRequestQuery).toString();
-
+  logger.info("Redirecting to platform", {
+    authenticationEndpoint: platform.authenticationEndpoint,
+  });
   return sendRedirect(event, url.href);
 });

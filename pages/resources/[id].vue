@@ -1,13 +1,9 @@
 <script setup>
 import { onMounted } from "vue";
-
 const route = useRoute();
-
 const resourceId = route.params.id;
 const ltiToken = route.query.lti;
-
 onMounted(async () => {
-  console.log("Url generated");
   try {
     const res = await $fetch("/api/generate-exam", {
       method: "POST",
@@ -16,12 +12,10 @@ onMounted(async () => {
         ltiToken,
       },
     });
-
-    // 🔥 Redirect to exam portal
-    console.log("redirect",res);
+    //console.log("redirect",res);
     window.location.href = res.redirectUrl;
   } catch (err) {
-    console.error("Error:", err);
+    //console.error("Error:", err);
   }
 });
 </script>

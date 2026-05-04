@@ -13,8 +13,7 @@ export default defineEventHandler(async () => {
         msg: "Access token fetched for exam API",
       });
   
-      const res = await axios.get(
-        `${process.env.LTI_SSO_EXAM_GENERATE}/sync/getexam/list`,
+      const res = await axios.get(url,
         {
           headers: {
             "req-access-token": accessToken,

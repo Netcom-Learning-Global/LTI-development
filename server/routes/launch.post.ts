@@ -119,11 +119,7 @@ export default defineEventHandler(async (event) => {
     tokenPayload[
       "https://purl.imsglobal.org/spec/lti-ags/claim/endpoint"
     ]?.lineitem;
-
-  console.log("🔥 LINEITEM FROM LAUNCH:", lineitem);
-
   await connectDB();
-
   await Launch.findOneAndUpdate(
     {
       userId: tokenPayload.sub,
@@ -142,14 +138,9 @@ export default defineEventHandler(async (event) => {
     },
     { upsert: true }
   );
-
-  // 🔥 ===== MAIN FIX END =====
-
   // ✅ Continue flow
   const ltiToken = createToolLtiToken(tokenPayload);
-
   const url = new URL(`resources/${resourceId}`, serverUrl);
   url.searchParams.append("lti", ltiToken);
-
   return sendRedirect(event, url.href);
 });

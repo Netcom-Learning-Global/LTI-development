@@ -22,12 +22,9 @@ export default defineEventHandler(async (event) => {
     if (!resourceId || isNaN(Number(resourceId))) {
       throw new Error("Invalid resourceId");
     }
-    const config = useRuntimeConfig();
-    // ✅ Get access token for exam API
     const accessToken = await getAccessToken();
     logger.info({
       requestId,
-      accessToken,
       msg: "Access token fetched",
     });
     // ✅ Decode LTI token
@@ -59,19 +56,11 @@ export default defineEventHandler(async (event) => {
             "https://purl.imsglobal.org/spec/lti/claim/ext"
           ]?.user_username) ||
       "LTI User";
-
-    // ✅ Extract LTI context (VERY IMPORTANT 🔥)
-    const clientId = decoded.clientId;
-    const platformUrl = decoded.platformUrl;
-    const deploymentId =decoded.deploymentId;
     const userId = decoded.userId;
-    //console.log("decodedUser",decoded);
-    const attemptId = `${resourceId}_${userId}_${Date.now()}`;
-    // ✅ Prepare payload for exam API
+    //const attemptId = `${resourceId}_${userId}_${Date.now()}`;
     logger.info({
       requestId,
       msg: "Attempt created",
-      attemptId,
       userId,
       examId: resourceId,
     });
@@ -79,16 +68,10 @@ export default defineEventHandler(async (event) => {
       exam_id: Number(resourceId),
       email,
       name,
-      password:
-        "$2b$10$B2re5z9b7GvwNSRWUxXodeNVy83VfQsiq92ZTLy/xrY2V7SXOMGEm",
-      additional_info: {
-        attemptId,
-      },
+      password:"$2b$10$B2re5z9b7GvwNSRWUxXodeNVy83VfQsiq92ZTLy/xrY2V7SXOMGEm",
     };
-
-    // ✅ Call external exam API
-    const res = await axios.post(
-      `${process.env.LTI_SSO_EXAM_GENERATE}/sync/generateexamlink`,
+    const url = `${process.env.LTI_SSO_EXAM_GENERATE}/sync/generateexamlink`;
+    const res = await axios.post(url,
       payload,
       {
         headers: {
@@ -100,9 +83,9 @@ export default defineEventHandler(async (event) => {
     );
     const examRes = res.data;
     if (examRes.error) {
-      logger.error({
-        msg: "Exam API returned error",
-        response: examRes,
+      logger.error("Exam API returned error", {
+        requestId,
+        status: res.status,
       });
       throw new Error("Exam API failed");
     }
@@ -117,13 +100,13 @@ export default defineEventHandler(async (event) => {
     await connectDB();
     const agsEndpoint = decoded["https://purl.imsglobal.org/spec/lti-ags/claim/endpoint"];
     const lineitem = agsEndpoint?.lineitem || decoded.lineitem;
-if (!lineitem) {
-  logger.warn({
-    requestId,
-    msg: "Lineitem missing in decoded token",
-    data:JSON.stringify(decoded, null, 2)
-  });
-}
+    if (!lineitem) {
+      logger.warn({
+        requestId,
+        msg: "Lineitem missing in decoded token",
+        data:JSON.stringify(decoded, null, 2)
+      });
+    }
     await Launch.findOneAndUpdate(
       {
         userId,
@@ -139,7 +122,7 @@ if (!lineitem) {
       msg: "Launch mapping saved",
       attemptId:token,
     });
-    const redirectUrl = `${process.env.STUDENT_URL}?examId=${examId}&userId=${token}&attemptId=${attemptId}`;
+    const redirectUrl = `${process.env.STUDENT_URL}?examId=${examId}&userId=${token}`;
     return { redirectUrl };
   } catch (err: any) {
     logger.error({

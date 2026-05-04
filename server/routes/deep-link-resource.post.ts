@@ -73,16 +73,12 @@ export default defineEventHandler(async (event) => {
 
   const platform = record?.data;
 
-  console.log("PLATFORM FROM DB:", platform);
-
   if (!platform) {
     throw createError({
       statusCode: 404,
       statusMessage: "Platform not found",
     });
   }
-
-  // 🔥 FIX: USE DB PRIVATE KEY (NOT MEMORY)
   const platformPrivateKey = platform.privateKey;
 
   if (!platformPrivateKey) {

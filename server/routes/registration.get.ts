@@ -2,6 +2,7 @@ import { ZodError, z } from "zod";
 import { generatePlatformKeyPair } from "../utils/auth";
 import { connectDB } from "../utils/db";
 import Platform from "../models/Platform";
+import logger from "../utils/logger";
 
 type Configuration = {
   issuer: string;
@@ -32,7 +33,7 @@ export default defineEventHandler(async (event) => {
       registration_token: registrationToken,
     } = await registrationQuerySchema.parseAsync(query));
   } catch (error: any) {
-    console.error(" Error parsing query", error);
+    logger.error("Error parsing query", { error });
 
     if (error instanceof ZodError) {
       throw createError({
@@ -115,38 +116,25 @@ const regRes = await fetch(configuration.registration_endpoint, {
   },
 });
 
-console.log("👉 REG STATUS:", regRes.status);
+logger.info("LTI registration response received", {
+  status: regRes.status,
+});
 
 const regData = await regRes.json();
-console.log("👉 REG RESPONSE:", regData);
 
 const clientId = regData.client_id;
-  /*
-  const { client_id: clientId }: { client_id: string } = await fetch(
-    configuration.registration_endpoint,
-    {
-      method: "POST",
-      body: JSON.stringify(registrationRequest),
-      headers: {
-        Authorization: `Bearer ${registrationToken}`,
-        "Content-Type": "application/json",
-      },
-    }
-  ).then(res => res.json());
-*/
   const platformName =
     configuration["https://purl.imsglobal.org/spec/lti-platform-configuration"]
       .product_family_code;
 
   const { kid, privateKey, publicKey } = await generatePlatformKeyPair();
 
-  // ✅ FINAL PLATFORM OBJECT
   const platform = {
     url: configuration.issuer,
     name: platformName,
     clientId,
     authenticationEndpoint: configuration.authorization_endpoint,
-    accessTokenEndpoint: configuration.token_endpoint, // ✅ FIXED
+    accessTokenEndpoint: configuration.token_endpoint, 
     authConfig: {
       method: "JWK_SET",
       key: configuration.jwks_uri,
@@ -156,13 +144,15 @@ const clientId = regData.client_id;
     publicKey,
   };
 
-  console.log("📦 REGISTERING PLATFORM:", platform);
+  logger.info("Registering platform", { platform });
 
   // ✅ CONNECT DB
   await connectDB();
 
-  // ✅ SAVE TO MONGODB (NO DUPLICATE ISSUE)
-  console.log("👉 SAVING PLATFORM:", platform);
+  logger.info("Saving platform to DB", {
+    iss: platform.url,
+    clientId: platform.clientId,
+  });
   await Platform.findOneAndUpdate(
     {
       iss: platform.url,
@@ -175,7 +165,6 @@ const clientId = regData.client_id;
     },
     { upsert: true, new: true }
   );
-  console.log("✅ Platform stored in MongoDB");
 
   appendResponseHeaders(event, {
     "content-type": "text/html",

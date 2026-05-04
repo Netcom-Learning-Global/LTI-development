@@ -73,11 +73,6 @@ export default defineEventHandler(async (event) => {
   }
 
   const { clientId, platformUrl, deploymentId, userId } = toolToken;
-
-  console.log("platformUrl:", platformUrl);
-  console.log("clientId:", clientId);
-  console.log("userId:", userId);
-
   // ✅ CONNECT DB
   await connectDB();
 
@@ -88,9 +83,6 @@ export default defineEventHandler(async (event) => {
   });
 
   const platform = record?.data;
-
-  console.log("PLATFORM FROM DB:", platform);
-
   if (!platform) {
     throw createError({
       statusCode: 404,
@@ -135,7 +127,6 @@ export default defineEventHandler(async (event) => {
     timestamp: new Date().toISOString(),
   };
 
-  // ✅ FIXED SCORE URL (CRITICAL 🔥)
   const rawLineitem =
     idToken[
       "https://purl.imsglobal.org/spec/lti-ags/claim/endpoint"
@@ -153,8 +144,6 @@ const baseLineitem = rawLineitem.split("?")[0];
 
 // ✅ FINAL URL
 const scoreUrl = `${baseLineitem}/scores`;
-  console.log("✅ Fixed Score URL:", scoreUrl);
-  // ✅ SEND SCORE TO MOODLE
   await $fetch(scoreUrl, {
     method: "POST",
     headers: {
@@ -164,7 +153,7 @@ const scoreUrl = `${baseLineitem}/scores`;
     body: payload,
   });
 
-  console.log("✅ Score successfully sent to Moodle 🎯");
+  logger.info("Score successfully sent to Moodle", { scoreUrl });
 
   return {
     success: true,
