@@ -1,8 +1,6 @@
 import mongoose from "mongoose";
 
 const { models, model, Schema } = mongoose;
-
-// ✅ Strong typing for platform.data
 export interface IPlatformData {
   url: string;
   name: string;
@@ -14,8 +12,6 @@ export interface IPlatformData {
     key: string;
   };
   kid: string;
-
-  // 🔥 REQUIRED FOR LTI
   privateKey: string;
   publicKey: string;
 }
@@ -23,14 +19,21 @@ export interface IPlatformData {
 export interface IPlatform {
   iss: string;
   clientId: string;
+  toolName?: string;
+  description?: string;
+  clientEmail?: string;
+  moodleUrl?: string;
   data: IPlatformData;
 }
 
 const platformSchema = new Schema<IPlatform>(
   {
-    iss: { type: String, required: true },
-    clientId: { type: String, required: true },
-
+    iss: { type: String},
+    clientId: { type: String },
+    toolName: String,
+    description: String,
+    clientEmail: String,
+    moodleUrl: String,
     data: {
       url: String,
       name: String,
@@ -42,8 +45,6 @@ const platformSchema = new Schema<IPlatform>(
         key: String,
       },
       kid: String,
-
-      // 🔥 ADD THESE (MOST IMPORTANT)
       privateKey: String,
       publicKey: String,
     },

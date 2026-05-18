@@ -52,6 +52,18 @@ const configRes = await fetch(configurationEndpoint);
 //console.log("👉 CONFIG STATUS:", configRes.status);
 
 const configuration: Configuration = await configRes.json();
+await connectDB();
+
+const existingPlatform = await Platform.findOne({
+  moodleUrl: configuration.issuer,
+});
+
+if (!existingPlatform) {
+  throw createError({
+    statusCode: 404,
+    statusMessage: "Platform onboarding data not found",
+  });
+}
 //console.log("👉 CONFIG DATA:", configuration);
  // const configuration: Configuration = await fetch(configurationEndpoint).then(res => res.json());
 
@@ -74,14 +86,14 @@ const configuration: Configuration = await configRes.json();
     response_types: ["id_token"],
     redirect_uris: [launchUrl.href, deepLinkUrl.href],
     initiate_login_uri: loginUrl.href,
-    client_name: "Proctor LTI Tool",
+    client_name: existingPlatform.toolName,
     jwks_uri: keysUrl.href,
     logo_uri: "https://moodle.org/theme/image.php/boost/lti/1776507478/monologo",
     token_endpoint_auth_method: "private_key_jwt",
     scope: scope.join(" "),
     "https://purl.imsglobal.org/spec/lti-tool-configuration": {
       domain: serverUrl,
-      description: "Connect your LMS for testing purposes",
+      description: existingPlatform.description,
       target_link_uri: launchUrl.href,
       custom_parameters: {},
       claims: configuration.claims_supported,
@@ -146,24 +158,23 @@ const clientId = regData.client_id;
 
   logger.info("Registering platform", { platform });
 
-  // ✅ CONNECT DB
-  await connectDB();
-
   logger.info("Saving platform to DB", {
     iss: platform.url,
     clientId: platform.clientId,
   });
   await Platform.findOneAndUpdate(
     {
-      iss: platform.url,
-      clientId: platform.clientId,
+      moodleUrl: configuration.issuer,
     },
     {
       iss: platform.url,
       clientId: platform.clientId,
       data: platform,
     },
-    { upsert: true, new: true }
+    {
+      upsert: true,
+      new: true,
+    }
   );
 
   appendResponseHeaders(event, {

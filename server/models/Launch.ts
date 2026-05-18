@@ -9,7 +9,7 @@ export interface ILaunch {
   deploymentId: string;
   userId: string;
   email: string;
-  attemptId: string; // ✅ FIXED
+  attemptId: string;
   lineitem: string
 }
 
@@ -20,7 +20,6 @@ const LaunchSchema = new Schema<ILaunch>({
   deploymentId: String,
   userId: String,
   email: String,
-  // 🔥 IMPROVED
   attemptId: {
     type: String,
     required: true,
