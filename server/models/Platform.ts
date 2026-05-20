@@ -51,12 +51,8 @@ const platformSchema = new Schema<IPlatform>(
   },
   { timestamps: true }
 );
-
-// 🔥 prevent duplicates
 platformSchema.index({ iss: 1, clientId: 1 }, { unique: true });
-
 const Platform =
   (models.Platform as mongoose.Model<IPlatform>) ||
   model<IPlatform>("Platform", platformSchema);
-
 export default Platform;
