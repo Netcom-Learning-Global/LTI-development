@@ -1,6 +1,6 @@
 import { createError } from "h3";
-import Platform from "../../../models/Platform";
-import {connectDB} from "../../../utils/db";
+import Platform from "../../models/Platform";
+import {connectDB} from "../../utils/db";
 
 export default defineEventHandler(async (event) => {
   await connectDB();
