@@ -15,12 +15,12 @@ export default defineEventHandler(async (event) => {
       {
         toolName: body.toolName,
         description: body.description,
-        clientEmail: body.clientEmail,
-        moodleUrl: body.moodleUrl,
       },
       {
         new: true,
       }
+    ).select(
+      "toolName description moodleUrl"
     );
 
   if (!updatedPlatform) {
