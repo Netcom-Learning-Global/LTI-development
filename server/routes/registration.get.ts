@@ -133,7 +133,6 @@ logger.info("LTI registration response received", {
 });
 
 const regData = await regRes.json();
-
 const clientId = regData.client_id;
   const platformName =
     configuration["https://purl.imsglobal.org/spec/lti-platform-configuration"]

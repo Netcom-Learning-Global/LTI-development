@@ -13,18 +13,21 @@ export default defineNuxtConfig({
     typeCheck: false,
     strict: false
   },
-
+  vite: {
+    server: {
+      allowedHosts: [
+        "populous-supersingular-ha.ngrok-free.dev"
+      ]
+    }
+  },
   runtimeConfig: {
     serverUrl: "http://localhost:9000",
     jwtSecret: "mysecret",
   },
-
   routeRules: {
     "/**": {
       headers: {
-        "X-Frame-Options": "ALLOWALL",
-        "Content-Security-Policy":
-          "frame-ancestors 'self' https://lms.proctor365.ai"
+        "X-Frame-Options": "ALLOWALL"
       }
     }
   }
