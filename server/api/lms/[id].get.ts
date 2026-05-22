@@ -10,7 +10,7 @@ export default defineEventHandler(async (event) => {
     const id = event.context.params?.id;
 
     const platform = await Platform.findById(id)
-      .select("toolName description moodleUrl");
+      .select("toolName description clientEmail moodleUrl");
 
     if (!platform) {
       throw createError({
