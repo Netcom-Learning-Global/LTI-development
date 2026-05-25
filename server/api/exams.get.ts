@@ -17,7 +17,6 @@ export default defineEventHandler(async (event) => {
         url,
       });
       const accessToken = await getAccessToken();
-      //console.log("url", url);
       logger.info({
         msg: "Access token fetched for exam API",
       });
