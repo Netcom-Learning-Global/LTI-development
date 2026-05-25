@@ -1,7 +1,15 @@
 import axios from "axios";
 import { getAccessToken } from "../api/auth";
 import logger from "../utils/logger";
-export default defineEventHandler(async () => {
+export default defineEventHandler(async (event) => {
+   const query = getQuery(event);
+   const {
+    searchQuery = "",
+    page = 1,
+    limit = 10,
+    sortBy = "created_date",
+    sortOrder = "ASC",
+  } = query;
     const url = `${process.env.LTI_SSO_EXAM_GENERATE}/sync/getexam/list`;
     try {
       logger.info({
@@ -12,13 +20,19 @@ export default defineEventHandler(async () => {
       logger.info({
         msg: "Access token fetched for exam API",
       });
-  
       const res = await axios.get(url,
         {
           headers: {
             "req-access-token": accessToken,
             "org-api-key": process.env.ORG_API_KEY!,
-          }
+          },
+          params: {
+            searchQuery,
+            page,
+            limit,
+            sortBy,
+            sortOrder,
+          },
         }
       );
       const exams = res?.data?.data?.data || [];

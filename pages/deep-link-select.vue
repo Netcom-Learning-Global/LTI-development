@@ -1,56 +1,90 @@
 <script setup>
-import { ref, onMounted } from "vue";
-
+import { ref, watch, onMounted } from "vue";
 const { query } = useRoute();
-
 if (!query.lti) {
   console.error("Missing LTI token query parameter");
 }
 
 const options = ref([]);
+const filteredOptions = ref([]);
 const selected = ref(null);
+const search = ref("");
+const loading = ref(false);
 
-// Fetch data
-onMounted(async () => {
+// Fetch exams
+const fetchExams = async (searchQuery = "") => {
   try {
-    const res = await $fetch("/api/exams");
+    loading.value = true;
+
+    const res = await $fetch("/api/exams", {
+      query: {
+        searchQuery,
+        page: 1,
+        limit: 10,
+      },
+    });
+
     options.value = res.map((item) => ({
       label: item.name,
       value: String(item.id),
     }));
 
-    if (options.value.length > 0) {
+    filteredOptions.value = options.value;
+
+    if (!selected.value && options.value.length > 0) {
       selected.value = options.value[0].value;
     }
   } catch (err) {
     console.error(err);
+  } finally {
+    loading.value = false;
   }
+};
+
+// Initial load
+onMounted(() => {
+  fetchExams();
 });
 
+// Search exams
+let timeout = null;
+
+watch(search, (val) => {
+  clearTimeout(timeout);
+
+  timeout = setTimeout(() => {
+    fetchExams(val);
+  }, 500);
+});
 const submit = async () => {
-   const selectedOption = options.value.find(
+  const selectedOption = options.value.find(
     (opt) => opt.value == selected.value
   );
 
-  // ✅ Show preview
+  // Preview
   document.querySelector(".card").innerHTML = `
-    <h3>✅ Exam Selected</h3>
-    <p>${selectedOption?.label}</p>
+    <h3 style="color:#000">✅ Exam Selected</h3>
+    <p style="color:#000">${selectedOption?.label}</p>
   `;
 
   const form = await $fetch("/deep-link-resource", {
     method: "POST",
-    body: {  resourceId: Number(selected.value), title: selectedOption?.label, },
+    body: {
+      resourceId: Number(selected.value),
+      title: selectedOption?.label,
+    },
     headers: {
       Authorization: `Bearer ${query.lti}`,
     },
     parseResponse: (txt) => txt,
   });
-// ✅ Auto submit form (close popup)
+
+  // Auto submit form
   const temp = document.createElement("div");
   temp.innerHTML = form;
 
   const formEl = temp.querySelector("form");
+
   if (formEl) {
     document.body.appendChild(formEl);
     formEl.submit();
@@ -61,74 +95,157 @@ const submit = async () => {
 <template>
   <div class="container">
     <div class="card">
+      <h2 class="title">Select Exam</h2>
 
-      <label class="label">Choose Resource</label>
-
-      <USelect
-        v-model="selected"
-        :options="options"
-        placeholder="Select Resource"
-        class="dropdown"
+      <!-- Search -->
+      <input
+        v-model="search"
+        type="text"
+        class="search-box"
+        placeholder="Search exam..."
       />
 
-      <UButton
+      <!-- Exam List -->
+      <div class="exam-list">
+        <label
+          v-for="exam in filteredOptions"
+          :key="exam.value"
+          class="exam-item"
+        >
+          <input
+            type="radio"
+            :value="exam.value"
+            v-model="selected"
+          />
+
+          <span>{{ exam.label }}</span>
+        </label>
+
+        <div
+          v-if="filteredOptions.length === 0"
+          class="empty"
+        >
+          No exams found
+        </div>
+      </div>
+
+      <!-- Submit -->
+      <button
         class="btn"
         @click="submit"
-        :disabled="!selected"
+        :disabled="!selected || loading"
       >
-        Submit
-      </UButton>
+        {{ loading ? "Loading..." : "Submit" }}
+      </button>
     </div>
   </div>
 </template>
-
 <style scoped>
-/* Page center */
-.container {
-  display: inline;
-  text-align: center;
+html,
+body,
+#__nuxt {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  background: #f4f6f9;
 }
 
-/* Card UI */
-.card {
-  background: #000;
-  padding: 30px;
-  border-radius: 12px;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+.container {
+  width: 100%;
+  max-width: 100%;
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow-x: hidden;
+  background: #f4f6f9;
 }
-.card h3{
+.card {
+  width: 420px;
+  max-width: calc(100vw - 40px);
+  background: #fff;
+  padding: 24px;
+  border-radius: 14px;
+  box-sizing: border-box;
+}
+.exam-list span{
   color:#000;
 }
-/* Title */
+
 .title {
-  font-size: 20px;
+  text-align: center;
+  margin-bottom: 18px;
+  font-size: 22px;
   font-weight: 600;
-  margin-bottom: 20px;
+  color: #222;
 }
 
-/* Label */
-.label {
+.search-box {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #dcdcdc;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  outline: none;
   font-size: 14px;
-  margin-bottom: 8px;
-  display: block;
 }
 
-/* Dropdown */
-.dropdown {
+.search-box:focus {
+  border-color: #CFA935;
+}
+
+.exam-list {
+  max-height: 300px;
+  overflow-y: auto;
+  border: 1px solid #ececec;
+  border-radius: 10px;
   margin-bottom: 20px;
 }
 
-/* Button */
+.exam-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  cursor: pointer;
+  border-bottom: 1px solid #f1f1f1;
+  transition: 0.2s;
+}
+
+.exam-item:hover {
+  background: #f7f7f7;
+}
+
+.exam-item:last-child {
+  border-bottom: none;
+}
+
+.empty {
+  padding: 16px;
+  text-align: center;
+  color: #888;
+}
+
 .btn {
   width: 100%;
-  background-color: #16833d;
+  background: #CFA935;
   color: white;
-  font-weight: 500;
-  padding: 10px;
+  border: none;
+  padding: 12px;
   border-radius: 8px;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 600;
   transition: 0.3s;
-  text-align: center;
-  display: block;
 }
 
+.btn:hover {
+  background: #CFA935;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
 </style>
