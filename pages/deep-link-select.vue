@@ -10,7 +10,6 @@ const filteredOptions = ref([]);
 const selected = ref(null);
 const search = ref("");
 const loading = ref(false);
-
 // Fetch exams
 const fetchExams = async (searchQuery = "") => {
   try {
@@ -20,7 +19,8 @@ const fetchExams = async (searchQuery = "") => {
       query: {
         searchQuery,
         page: 1,
-        limit: 10,
+        limit: 30,
+        moodleUrl: String(query.iss).replace(/\/$/, "").trim()
       },
     });
 
@@ -30,7 +30,6 @@ const fetchExams = async (searchQuery = "") => {
     }));
 
     filteredOptions.value = options.value;
-
     if (!selected.value && options.value.length > 0) {
       selected.value = options.value[0].value;
     }
@@ -40,7 +39,6 @@ const fetchExams = async (searchQuery = "") => {
     loading.value = false;
   }
 };
-
 // Initial load
 onMounted(() => {
   fetchExams();
@@ -48,10 +46,8 @@ onMounted(() => {
 
 // Search exams
 let timeout = null;
-
 watch(search, (val) => {
   clearTimeout(timeout);
-
   timeout = setTimeout(() => {
     fetchExams(val);
   }, 500);
@@ -60,7 +56,6 @@ const submit = async () => {
   const selectedOption = options.value.find(
     (opt) => opt.value == selected.value
   );
-
   // Preview
   document.querySelector(".card").innerHTML = `
     <h3 style="color:#000">✅ Exam Selected</h3>

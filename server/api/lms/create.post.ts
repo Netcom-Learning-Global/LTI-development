@@ -5,16 +5,14 @@ import axios from "axios";
 export default defineEventHandler(async (event) => {
   try {
     await connectDB();
-
     const body = await readBody(event);
-
     const {
       toolName,
       description,
       clientEmail,
       moodleUrl,
+      org_id,
     } = body;
-
     if (
       !toolName ||
       !description ||
@@ -26,20 +24,27 @@ export default defineEventHandler(async (event) => {
         statusMessage: "All fields are required",
       });
     }
-
-    // prevent duplicate Moodle URL
-    //console.log("Incoming moodleUrl:", moodleUrl);
     const alreadyExists = await Platform.findOne({
       moodleUrl,
     });
-    //console.log("alreadyExists:", alreadyExists);
     if (alreadyExists) {
       throw createError({
         statusCode: 400,
         statusMessage: "Moodle URL already connected",
       });
     }
-
+    const orgApiRes = await axios.post(
+      `${process.env.AUTH_URL}/auth/getapikeys`,
+      {
+        org_id: Number(org_id),
+      },
+       {
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
+    const orgData = orgApiRes?.data?.data || {};
     const platform = await Platform.create({
       iss: moodleUrl,
       clientId: `moodle_${Date.now()}`,
@@ -47,8 +52,10 @@ export default defineEventHandler(async (event) => {
       description,
       clientEmail,
       moodleUrl,
+      orgId: orgData.org_id,
+      apiKey: orgData.api_key,
+      secretKey: orgData.secret_key,
     });
-     // communication service payload
      const emailPayload = {
       email: clientEmail,
       name: toolName,
@@ -79,8 +86,6 @@ export default defineEventHandler(async (event) => {
       data: platform,
     };
   } catch (error: any) {
-    //console.error("CREATE LMS ERROR:", error);
-
   throw createError({
     statusCode:error.statusCode || 500,
     statusMessage:

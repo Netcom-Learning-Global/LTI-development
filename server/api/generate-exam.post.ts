@@ -4,6 +4,7 @@ import { connectDB } from "../utils/db";
 import logger from "../utils/logger";
 import { randomUUID } from "crypto";
 import Launch from "../models/Launch";
+import Platform from "../models/Platform"; // Assuming you have a Platform model defined in ../models/Platform
 
 export default defineEventHandler(async (event) => {
   const requestId = randomUUID();
@@ -22,11 +23,7 @@ export default defineEventHandler(async (event) => {
     if (!resourceId || isNaN(Number(resourceId))) {
       throw new Error("Invalid resourceId");
     }
-    const accessToken = await getAccessToken();
-    logger.info({
-      requestId,
-      msg: "Access token fetched",
-    });
+   
     // ✅ Decode LTI token
     let decoded: any = {};
     try {
@@ -41,6 +38,17 @@ export default defineEventHandler(async (event) => {
       });
       throw new Error("Invalid LTI token");
     }
+    await connectDB();
+    const issuer = decoded.iss;
+    const platform = await Platform.findOne({
+      moodleUrl: String(issuer),
+    });
+    if (!platform) {
+      throw new Error("Platform not found");
+    }
+     const accessToken = await getAccessToken(
+      Number(platform.orgId)
+    );
     // ✅ Extract user info
     const email =
       decoded.email ||
@@ -56,20 +64,19 @@ export default defineEventHandler(async (event) => {
             "https://purl.imsglobal.org/spec/lti/claim/ext"
           ]?.user_username) ||
       "LTI User";
-    const userId = decoded.userId;
-    //const attemptId = `${resourceId}_${userId}_${Date.now()}`;
-    logger.info({
-      requestId,
-      msg: "Attempt created",
-      userId,
-      examId: resourceId,
-    });
-    const payload = {
-      exam_id: Number(resourceId),
-      email,
-      name,
-      password:"$2b$10$B2re5z9b7GvwNSRWUxXodeNVy83VfQsiq92ZTLy/xrY2V7SXOMGEm",
-    };
+      const userId = decoded.userId;
+      logger.info({
+        requestId,
+        msg: "Attempt created",
+        userId,
+        examId: resourceId,
+      });
+      const payload = {
+        exam_id: Number(resourceId),
+        email,
+        name,
+        password:"$2b$10$B2re5z9b7GvwNSRWUxXodeNVy83VfQsiq92ZTLy/xrY2V7SXOMGEm",
+      };
     const url = `${process.env.LTI_SSO_EXAM_GENERATE}/sync/generateexamlink`;
     const res = await axios.post(url,
       payload,
@@ -96,7 +103,6 @@ export default defineEventHandler(async (event) => {
       msg: "Exam generated successfully",
       examId,
     });
-    // 🔥 SAVE LTI CONTEXT FOR WEBHOOK
     await connectDB();
     const agsEndpoint = decoded["https://purl.imsglobal.org/spec/lti-ags/claim/endpoint"];
     const lineitem = agsEndpoint?.lineitem || decoded.lineitem;
