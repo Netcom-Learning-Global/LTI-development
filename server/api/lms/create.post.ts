@@ -11,7 +11,7 @@ export default defineEventHandler(async (event) => {
       description,
       clientEmail,
       moodleUrl,
-      org_id,
+      orgId,
     } = body;
     if (
       !toolName ||
@@ -36,7 +36,7 @@ export default defineEventHandler(async (event) => {
     const orgApiRes = await axios.post(
       `${process.env.AUTH_URL}/auth/getapikeys`,
       {
-        org_id: Number(org_id),
+        org_id: Number(orgId),
       },
        {
         headers: {
