@@ -39,7 +39,7 @@ export default defineEventHandler(async (event) => {
       throw new Error("Invalid LTI token");
     }
     await connectDB();
-    const issuer = decoded.iss;
+    const issuer = decoded.platformUrl;
     const platform = await Platform.findOne({
       moodleUrl: String(issuer),
     });
