@@ -23,6 +23,9 @@ export interface IPlatform {
   description?: string;
   clientEmail?: string;
   moodleUrl?: string;
+  orgId?: number;
+  apiKey?: string;
+  secretKey?: string;
   data: IPlatformData;
 }
 
@@ -34,6 +37,15 @@ const platformSchema = new Schema<IPlatform>(
     description: String,
     clientEmail: String,
     moodleUrl: String,
+    orgId: {
+      type: Number,
+    },
+    apiKey: {
+      type: String,
+    },
+    secretKey: {
+      type: String,
+    },
     data: {
       url: String,
       name: String,

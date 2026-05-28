@@ -8,7 +8,6 @@ import {
 import jwt from "jsonwebtoken";
 import useIDTokenStorage, { getIDTokenStorageKey } from "../storage/idToken";
 
-// 🔥 NEW: simple state store (replace with DB/Redis in prod)
 import { getState } from "../storage/state"; // you will create this
 
 const deepLinkLaunchBodySchema = z.object({
@@ -22,7 +21,7 @@ export default defineEventHandler(async (event) => {
 
   let idToken, state;
 
-  // ✅ Parse body
+  //  Parse body
   try {
     ({ id_token: idToken, state } =
       await deepLinkLaunchBodySchema.parseAsync(body));
@@ -41,7 +40,7 @@ export default defineEventHandler(async (event) => {
 
   let tokenPayload;
 
-  // ✅ Validate LTI token
+  // Validate LTI token
   try {
     tokenPayload = await validatePlatformToken(idToken);
   } catch (error) {
@@ -71,8 +70,6 @@ export default defineEventHandler(async (event) => {
       statusMessage: "Something went wrong",
     });
   }
-
-  // 🔥 ===== FIX: SERVER-SIDE STATE VALIDATION =====
   const stateData = await getState(state);
 
   if (!stateData) {
@@ -89,19 +86,13 @@ export default defineEventHandler(async (event) => {
     });
   }
 
-  // ⏳ Expiry check (5 minutes)
   if (Date.now() - stateData.createdAt > 5 * 60 * 1000) {
     throw createError({
       statusCode: 401,
       statusMessage: "State expired",
     });
   }
-
-  // 🔐 Prevent replay
   await stateData.delete();
-  // 🔥 ===== END FIX =====
-
-  // ✅ Store ID Token
   const idTokenStorage = useIDTokenStorage();
 
   const idTokenStorageKey = getIDTokenStorageKey({
@@ -113,13 +104,12 @@ export default defineEventHandler(async (event) => {
   });
 
   await idTokenStorage.setItem(idTokenStorageKey, tokenPayload);
-
-  // ✅ Create internal LTI token
   const ltiToken = createToolLtiToken(tokenPayload);
-
-  // ✅ Redirect to your deep link UI
   const url = new URL("deep-link-select", serverUrl);
   url.searchParams.append("lti", ltiToken);
-
+  url.searchParams.append(
+    "iss",
+    tokenPayload.iss
+  );
   return sendRedirect(event, url.href);
 });

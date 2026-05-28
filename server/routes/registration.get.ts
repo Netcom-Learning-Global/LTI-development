@@ -24,9 +24,7 @@ const registrationQuerySchema = z.object({
 export default defineEventHandler(async (event) => {
   const query = getQuery(event);
   const { serverUrl } = useRuntimeConfig();
-
   let configurationEndpoint, registrationToken;
-
   try {
     ({
       openid_configuration: configurationEndpoint,
@@ -49,8 +47,6 @@ export default defineEventHandler(async (event) => {
   }
 
 const configRes = await fetch(configurationEndpoint);
-//console.log("👉 CONFIG STATUS:", configRes.status);
-
 const configuration: Configuration = await configRes.json();
 await connectDB();
 
@@ -64,9 +60,6 @@ if (!existingPlatform) {
     statusMessage: "Platform onboarding data not found",
   });
 }
-//console.log("👉 CONFIG DATA:", configuration);
- // const configuration: Configuration = await fetch(configurationEndpoint).then(res => res.json());
-
   const scope = [
     "https://purl.imsglobal.org/spec/lti-ags/scope/lineitem.readonly",
     "https://purl.imsglobal.org/spec/lti-ags/scope/lineitem",
@@ -116,8 +109,6 @@ if (!existingPlatform) {
     },
   };
 
-  // ✅ Register tool with LMS
-  //console.log("👉 REG ENDPOINT:", configuration.registration_endpoint);
 
 const regRes = await fetch(configuration.registration_endpoint, {
   method: "POST",

@@ -1,40 +1,48 @@
 import axios from "axios";
+import { getQuery } from "h3";
 import { getAccessToken } from "../api/auth";
 import logger from "../utils/logger";
+import Platform from "../models/Platform";
+import { connectDB } from "../utils/db";
 export default defineEventHandler(async (event) => {
    const query = getQuery(event);
    const {
     searchQuery = "",
     page = 1,
-    limit = 10,
+    limit = 30,
     sortBy = "created_date",
     sortOrder = "ASC",
+    moodleUrl,
   } = query;
     const url = `${process.env.LTI_SSO_EXAM_GENERATE}/sync/getexam/list`;
     try {
-      logger.info({
-        msg: "Fetching exam list",
-        url,
-      });
-      const accessToken = await getAccessToken();
+    await connectDB();
+    const platform = await Platform.findOne({
+     moodleUrl: String(moodleUrl),
+    });
+    if (!platform) {
+      throw new Error("Platform not found");
+    }
+      const accessToken = await getAccessToken(Number(platform.orgId));
       logger.info({
         msg: "Access token fetched for exam API",
+        orgId: platform.orgId,
+        accessToken: accessToken ? "YES" : "NO",
       });
-      const res = await axios.get(url,
-        {
-          headers: {
-            "req-access-token": accessToken,
-            "org-api-key": process.env.ORG_API_KEY!,
-          },
-          params: {
-            searchQuery,
-            page,
-            limit,
-            sortBy,
-            sortOrder,
-          },
-        }
-      );
+      const res = await axios.get(url, {
+      headers: {
+        "req-access-token": accessToken,
+        "org-api-key": String(platform.apiKey),
+      },
+
+      params: {
+        searchQuery,
+        page,
+        limit,
+        sortBy,
+        sortOrder,
+      },
+    });
       const exams = res?.data?.data?.data || [];
       logger.info({
         msg: "Exam list fetched successfully",
@@ -52,7 +60,6 @@ export default defineEventHandler(async (event) => {
         response: err.response?.data,
         error: err.message,
       });
-      //console.error(" EXAM API ERROR:", err.response?.data || err.message);
       return [];
     }
   });

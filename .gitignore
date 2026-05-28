@@ -23,3 +23,5 @@ logs
 .env
 .env.*
 !.env.example
+package-lock.json
+nuxt.config.ts
