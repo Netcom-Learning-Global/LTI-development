@@ -38,6 +38,7 @@ export default defineEventHandler(async (event) => {
       });
       throw new Error("Invalid LTI token");
     }
+   
     await connectDB();
     const issuer = decoded.platformUrl;
     const platform = await Platform.findOne({
@@ -49,7 +50,6 @@ export default defineEventHandler(async (event) => {
      const accessToken = await getAccessToken(
       Number(platform.orgId)
     );
-    // ✅ Extract user info
     const email =
       decoded.email ||
       decoded["https://purl.imsglobal.org/spec/lti/claim/ext"]?.user_email ||
@@ -83,7 +83,7 @@ export default defineEventHandler(async (event) => {
       {
         headers: {
           "req-access-token": String(accessToken),
-          "org-api-key": String(process.env.ORG_API_KEY),
+          "org-api-key": String(platform.apiKey),
         },
         timeout: 15000
       }
