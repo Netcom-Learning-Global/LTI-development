@@ -24,8 +24,69 @@ export default defineEventHandler(async (event) => {
         statusMessage: "All fields are required",
       });
     }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const websiteRegex =/^https:\/\/([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}\/?$/;
+    const normalizedMoodleUrl = moodleUrl.trim().replace(/\/$/, "");
+    if (!emailRegex.test(clientEmail)) {
+      throw createError({
+        statusCode: 400,
+        statusMessage: "Invalid email address",
+      });
+    }
+
+    if (!websiteRegex.test(normalizedMoodleUrl)) {
+      throw createError({
+        statusCode: 400,
+        statusMessage:
+          "Invalid Moodle URL. Use format: https://google.com",
+      });
+    }
+    if (!orgId || isNaN(Number(orgId))) {
+      throw createError({
+        statusCode: 400,
+        statusMessage: "Invalid Organization ID",
+      });
+    }
+    
+    let orgApiRes;
+    try {
+      orgApiRes = await axios.post(
+        `${process.env.AUTH_URL}/auth/getapikeys`,
+        {
+          org_id: Number(orgId),
+        },
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+    } catch (err: any) {
+      throw createError({
+        statusCode:
+          err?.response?.status ||
+          err?.statusCode ||
+          500,
+
+        statusMessage:
+          err?.response?.data?.message_code ||
+          err?.response?.data?.message ||
+          err?.message ||
+          "Internal Server Error",
+
+        data: err?.response?.data,
+      });
+    }
+    
+    const orgData = orgApiRes?.data?.data || {};
+    if (!orgData?.org_id || !orgData?.api_key || !orgData?.secret_key) {
+      throw createError({
+        statusCode: 404,
+        statusMessage: "Organization API keys not found",
+      });
+    }
     const alreadyExists = await Platform.findOne({
-      moodleUrl,
+       moodleUrl:normalizedMoodleUrl,
     });
     if (alreadyExists) {
       throw createError({
@@ -33,25 +94,13 @@ export default defineEventHandler(async (event) => {
         statusMessage: "Moodle URL already connected",
       });
     }
-    const orgApiRes = await axios.post(
-      `${process.env.AUTH_URL}/auth/getapikeys`,
-      {
-        org_id: Number(orgId),
-      },
-       {
-        headers: {
-          "Content-Type": "application/json",
-        },
-      }
-    );
-    const orgData = orgApiRes?.data?.data || {};
     const platform = await Platform.create({
-      iss: moodleUrl,
+      iss: normalizedMoodleUrl,
       clientId: `moodle_${Date.now()}`,
       toolName,
       description,
       clientEmail,
-      moodleUrl,
+      moodleUrl: normalizedMoodleUrl,
       orgId: orgData.org_id,
       apiKey: orgData.api_key,
       secretKey: orgData.secret_key,
@@ -59,7 +108,7 @@ export default defineEventHandler(async (event) => {
      const emailPayload = {
       email: clientEmail,
       name: toolName,
-      moodleUrl,
+      moodleUrl: normalizedMoodleUrl,
       registrationUrl:
         `${process.env.NUXT_SERVER_URL}/registration`,
     };
@@ -87,11 +136,16 @@ export default defineEventHandler(async (event) => {
     };
   } catch (error: any) {
   throw createError({
-    statusCode:error.statusCode || 500,
-    statusMessage:
-      error.statusMessage ||
-      error.message ||
-      "Internal Server Error",
-  });
+      statusCode:
+        error?.statusCode ||
+        error?.response?.status ||
+        500,
+
+      statusMessage:
+        error?.statusMessage ||
+        error?.response?.data?.message_code ||
+        error?.message ||
+        "Internal Server Error",
+    });
   }
 });
