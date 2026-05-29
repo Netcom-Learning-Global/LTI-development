@@ -47,7 +47,15 @@ export default defineEventHandler(async (event) => {
         statusMessage: "Invalid Organization ID",
       });
     }
-    
+    const alreadyExists = await Platform.findOne({
+       moodleUrl:normalizedMoodleUrl,
+    });
+    if (alreadyExists) {
+      throw createError({
+        statusCode: 400,
+        statusMessage: "Moodle URL already connected",
+      });
+    }
     let orgApiRes;
     try {
       orgApiRes = await axios.post(
@@ -62,18 +70,21 @@ export default defineEventHandler(async (event) => {
         }
       );
     } catch (err: any) {
+      const messageCode = err?.response?.data?.message_code;
+      let userMessage =
+        err?.response?.data?.message ||
+        err?.message ||
+        "Internal Server Error";
+      if (messageCode === "API_KEYS_NOT_FOUND") {
+        userMessage =
+          "No API keys were found for the selected Organization ID. Please generate API keys for this organization and try again.";
+      }
       throw createError({
         statusCode:
           err?.response?.status ||
           err?.statusCode ||
           500,
-
-        statusMessage:
-          err?.response?.data?.message_code ||
-          err?.response?.data?.message ||
-          err?.message ||
-          "Internal Server Error",
-
+        statusMessage: userMessage,
         data: err?.response?.data,
       });
     }
@@ -85,15 +96,7 @@ export default defineEventHandler(async (event) => {
         statusMessage: "Organization API keys not found",
       });
     }
-    const alreadyExists = await Platform.findOne({
-       moodleUrl:normalizedMoodleUrl,
-    });
-    if (alreadyExists) {
-      throw createError({
-        statusCode: 400,
-        statusMessage: "Moodle URL already connected",
-      });
-    }
+    
     const platform = await Platform.create({
       iss: normalizedMoodleUrl,
       clientId: `moodle_${Date.now()}`,
