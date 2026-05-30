@@ -4,7 +4,7 @@ import {connectDB} from "../../utils/db";
 export default defineEventHandler(async () => {
   await connectDB();
 
-  const platforms = await Platform.find().select("toolName description moodleUrl").sort({
+  const platforms = await Platform.find().select("toolName description moodleUrl orgId").sort({
     createdAt: -1,
   });
 
