@@ -27,6 +27,7 @@ export interface IPlatform {
   apiKey?: string;
   secretKey?: string;
   data: IPlatformData;
+  orgName?: string;
 }
 
 const platformSchema = new Schema<IPlatform>(
@@ -59,6 +60,9 @@ const platformSchema = new Schema<IPlatform>(
       kid: String,
       privateKey: String,
       publicKey: String,
+    },
+    orgName: {
+      type: String,
     },
   },
   { timestamps: true }
