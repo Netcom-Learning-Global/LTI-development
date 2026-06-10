@@ -12,6 +12,7 @@ export default defineEventHandler(async (event) => {
       clientEmail,
       moodleUrl,
       orgId,
+      orgName
     } = body;
     if (
       !toolName ||
@@ -107,6 +108,7 @@ export default defineEventHandler(async (event) => {
       orgId: orgData.org_id,
       apiKey: orgData.api_key,
       secretKey: orgData.secret_key,
+      orgName,
     });
      const emailPayload = {
       email: clientEmail,
