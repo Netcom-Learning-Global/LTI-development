@@ -12,12 +12,12 @@ export default defineEventHandler(async (event) => {
       msg: "Webhook received",
       body,
     });
-    const { exam_id, candidateScore, additional_info,client_id } = body;
+    const { exam_id, candidateScore, additional_info,student_session_token } = body;
     const [getscore, totalStr] = candidateScore.split("/");
-    if (!client_id) {
+    if (!student_session_token) {
       logger.warn({
         requestId,
-        msg: "Missing client_id",
+        msg: "Missing student_session_token",
         body,
       });
       throw createError({
@@ -25,7 +25,7 @@ export default defineEventHandler(async (event) => {
         statusMessage: "client_id missing",
       });
     }
-    const attemptId = client_id;
+    const attemptId = student_session_token;
     const score = Number(getscore || 0);
     const total = Number(totalStr || 0);
     await connectDB();
@@ -86,7 +86,7 @@ export default defineEventHandler(async (event) => {
     logger.info({
       requestId,
       msg: "✅ Score updated in Moodle",
-      client_id,
+      student_session_token,
     });
     return {
       success: true,
