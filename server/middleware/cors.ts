@@ -6,6 +6,7 @@ export default defineEventHandler((event) => {
     "https://auth.proctor365.ai",
     "https://adminapis.proctor365.ai",
     "https://devadminapis.proctor365.ai",
+    "https://lms.proctor365.ai",
     "https://lti.proctor365.ai",
   ];
 
@@ -25,22 +26,22 @@ export default defineEventHandler((event) => {
 
   // Content Security Policy (Temporary for debugging)
   setHeader(
-    event,
-    "Content-Security-Policy",
-    [
-      "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-      "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: https:",
-      "font-src 'self' data: https:",
-      "connect-src 'self' https://adminapis.proctor365.ai https://devadminapis.proctor365.ai https://auth.proctor365.ai https://devauth.proctor365.ai ws: wss:",
-      "object-src 'none'",
-      "base-uri 'self'",
-      "frame-ancestors 'self'",
-      "form-action 'self'",
-      "upgrade-insecure-requests"
-    ].join("; ")
-  );
+  event,
+  "Content-Security-Policy",
+  [
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: https:",
+    "font-src 'self' data: https:",
+    "connect-src 'self' https://adminapis.proctor365.ai https://devadminapis.proctor365.ai https://auth.proctor365.ai https://devauth.proctor365.ai https://lms.proctor365.ai ws: wss:",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "frame-ancestors 'self' https://lms.proctor365.ai",
+    "form-action 'self'",
+    "upgrade-insecure-requests"
+  ].join("; ")
+);
 
   // Additional Security Headers
   setHeader(event, "X-Content-Type-Options", "nosniff");
