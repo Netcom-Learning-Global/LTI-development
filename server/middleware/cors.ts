@@ -22,17 +22,18 @@ export default defineEventHandler((event) => {
     "Access-Control-Allow-Headers",
     "Content-Type, Authorization"
   );
- // Content Security Policy
+
+  // Content Security Policy (Temporary for debugging)
   setHeader(
     event,
     "Content-Security-Policy",
     [
       "default-src 'self'",
-      "script-src 'self'",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: https:",
-      "font-src 'self' https:",
-      "connect-src 'self' https://adminapis.proctor365.ai https://devadminapis.proctor365.ai https://auth.proctor365.ai https://devauth.proctor365.ai",
+      "font-src 'self' data: https:",
+      "connect-src 'self' https://adminapis.proctor365.ai https://devadminapis.proctor365.ai https://auth.proctor365.ai https://devauth.proctor365.ai ws: wss:",
       "object-src 'none'",
       "base-uri 'self'",
       "frame-ancestors 'self'",
@@ -55,6 +56,7 @@ export default defineEventHandler((event) => {
     "Strict-Transport-Security",
     "max-age=31536000; includeSubDomains"
   );
+
   if (getMethod(event) === "OPTIONS") {
     event.node.res.statusCode = 204;
     event.node.res.end();
